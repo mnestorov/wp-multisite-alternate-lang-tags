@@ -20,43 +20,48 @@ if (!is_multisite()) {
     return;
 }
 
-// Add hreflang tags to <head>
+// Add hreflang tags dynamically to <head>
 function mn_add_hreflang_tags() {
     global $post;
 
-    // Get current blog ID and list of alternate sites
+    // Define your site IDs (you can also retrieve this dynamically if needed)
+    $english_site_id   = 1;  // English site
+    $bulgarian_site_id = 2;  // Bulgarian site
+    $german_site_id    = 3;  // German site
+
+    // Dynamically determine the base URLs for each language/site based on site ID
+    $english_url    = trailingslashit(get_home_url($english_site_id));  // English site URL
+    $bulgarian_url  = trailingslashit(get_home_url($bulgarian_site_id));  // Bulgarian site URL
+    $german_url     = trailingslashit(get_home_url($german_site_id));  // German site URL
+
+    // Determine the current URL or path
+    if (is_home() || is_front_page()) {
+        $current_url = get_home_url(null, '/');  // Homepage
+    } elseif (function_exists('is_shop') && is_shop()) {
+        $current_url = get_permalink(wc_get_page_id('shop'));  // WooCommerce shop page
+    } elseif ($post && $post->post_type === 'product') {
+        $current_url = get_permalink($post->ID);  // Product page
+    } else {
+        $current_url = get_permalink(get_queried_object_id());  // Any other page/post
+    }
+
+    // Extract the path from the current URL to append it to alternate URLs
+    $path = str_replace(trailingslashit(get_site_url()), '', $current_url);
+
+    // Get current site ID
     $current_blog_id = get_current_blog_id();
-    $sites = get_sites(['public' => 1]);
 
-    // Ensure relevant post types are processed (pages, posts, products, etc.)
-    if (is_page() || is_single() || (function_exists('is_shop') && is_shop())) {
-        $path = '';
-        if (is_home() || is_front_page()) {
-            $path = '/';
-        } elseif (function_exists('is_shop') && is_shop()) {
-            $path = get_permalink(wc_get_page_id('shop'));
-        } else {
-            $path = get_permalink($post->ID);
-        }
-
-        // Iterate over each site in the multisite network
-        foreach ($sites as $site) {
-            $blog_id = $site->blog_id;
-
-            // Skip the current site
-            if ($blog_id != $current_blog_id) {
-                switch_to_blog($blog_id);
-                
-                // Generate the alternate URL and get site language
-                $alternate_url = trailingslashit(get_home_url()) . $path;
-                $language = get_bloginfo('language');
-                
-                // Output the hreflang tag
-                echo '<link rel="alternate" hreflang="' . esc_attr($language) . '" href="' . esc_url($alternate_url) . '" />' . "\n";
-                
-                restore_current_blog();
-            }
-        }
+    // Output hreflang tags based on the current site
+    if ($current_blog_id == $bulgarian_site_id) {  // Bulgarian site
+        echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url . $path) . '"/>' . "\n";
+        echo '<link rel="alternate" hreflang="de-DE" href="' . esc_url($german_url . $path) . '"/>' . "\n";
+    } elseif ($current_blog_id == $english_site_id) {  // English site
+        echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url . $path) . '"/>' . "\n";
+        echo '<link rel="alternate" hreflang="bg-BG" href="' . esc_url($bulgarian_url . $path) . '"/>' . "\n";
+        echo '<link rel="alternate" hreflang="de-DE" href="' . esc_url($german_url . $path) . '"/>' . "\n";
+    } elseif ($current_blog_id == $german_site_id) {  // German site
+        echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url . $path) . '"/>' . "\n";
+        echo '<link rel="alternate" hreflang="bg-BG" href="' . esc_url($bulgarian_url . $path) . '"/>' . "\n";
     }
 }
 add_action('wp_head', 'mn_add_hreflang_tags');
@@ -151,22 +156,27 @@ function mn_render_network_settings_page() {
     echo '<h1>' . esc_html__('Network Alternate Language Tags Settings', 'mn-multisite-alternate-lang-tags') . '</h1>';
     echo '<form method="post" action="edit.php?action=update_network_settings">';
     wp_nonce_field('update_network_settings_nonce');
-    
+
     // Excluded Sites
     echo '<h2>' . esc_html__('Excluded Sites', 'mn-multisite-alternate-lang-tags') . '</h2>';
     $excluded_sites = get_site_option('mn_excluded_sites', []);
     echo '<input type="text" name="mn_excluded_sites" value="' . esc_attr(implode(',', $excluded_sites)) . '" placeholder="Enter site IDs separated by commas" />';
-    
+
     // Excluded Languages
     echo '<h2>' . esc_html__('Excluded Languages', 'mn-multisite-alternate-lang-tags') . '</h2>';
     $excluded_languages = get_site_option('mn_excluded_languages', []);
     echo '<input type="text" name="mn_excluded_languages" value="' . esc_attr(implode(',', $excluded_languages)) . '" placeholder="Enter language codes separated by commas (e.g., en-US, bg-BG)" />';
-    
+
     // Default Site for x-default
     echo '<h2>' . esc_html__('Default Site for x-default', 'mn-multisite-alternate-lang-tags') . '</h2>';
     $default_site = get_site_option('mn_default_site', '');
     echo '<input type="text" name="mn_default_site" value="' . esc_attr($default_site) . '" placeholder="Enter default site ID" />';
-    
+
+    // Enable/Disable Caching
+    echo '<h2>' . esc_html__('Enable Caching', 'mn-multisite-alternate-lang-tags') . '</h2>';
+    $enable_caching = get_site_option('mn_enable_caching', true);
+    echo '<input type="checkbox" name="mn_enable_caching" value="1"' . checked(1, $enable_caching, false) . ' /> Enable caching';
+
     submit_button(__('Save Network Settings', 'mn-multisite-alternate-lang-tags'));
     echo '</form>';
 }
@@ -207,6 +217,17 @@ add_action('admin_init', 'mn_register_settings');
 
 // Caching and transients
 function mn_get_cached_hreflang_tags() {
+    // Check if caching is enabled in the network settings
+    $enable_caching = get_site_option('mn_enable_caching', true);
+
+    // If caching is disabled, return hreflang tags without caching
+    if (!$enable_caching) {
+        ob_start();
+        do_action('mn_add_hreflang_tags');
+        return ob_get_clean(); // Return tags directly without caching
+    }
+
+    // Otherwise, proceed with caching
     $transient_key = 'hreflang_tags_' . get_current_blog_id();
     $cached_tags = get_transient($transient_key);
 
