@@ -20,7 +20,40 @@ if (!is_multisite()) {
     return;
 }
 
-// Add hreflang tags dynamically to <head>
+/**
+ * Dynamically generate hreflang tags for all sites in a WordPress multisite network.
+ */
+/* NEED SOME TESTING
+function mn_dynamic_hreflang_tags() {
+    global $post;
+    $sites = get_sites(['public' => 1]); // Fetch all public sites within the network
+    $current_url = (is_singular()) ? get_permalink($post->ID) : home_url(add_query_arg(null, null));
+
+    $site_urls = [];
+    foreach ($sites as $site) {
+        switch_to_blog($site->blog_id);
+        $language_code = get_bloginfo('language');
+        $site_urls[$language_code] = home_url($current_url);
+        restore_current_blog();
+    }
+
+    $default_language = 'en-US'; // Set the default x-default language code
+    foreach ($site_urls as $lang => $url) {
+        echo '<link rel="alternate" hreflang="' . esc_attr($lang) . '" href="' . esc_url($url) . '" />' . "\n";
+    }
+
+    // x-default should point to the English site or another designated default
+    if (isset($site_urls[$default_language])) {
+        echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($site_urls[$default_language]) . '" />' . "\n";
+    }
+}
+add_action('wp_head', 'mn_dynamic_hreflang_tags');
+*/
+
+
+/**
+ * Add hreflang tags dynamically to <head>
+ */
 function mn_add_hreflang_tags() {
     global $post;
 
@@ -54,6 +87,7 @@ function mn_add_hreflang_tags() {
     // Output hreflang tags based on the current site
     if ($current_blog_id == $bulgarian_site_id) {  // Bulgarian site
         echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url . $path) . '"/>' . "\n";
+        echo '<link rel="alternate" hreflang="bg-BG" href="' . esc_url($bulgarian_url . $path) . '"/>' . "\n";
         echo '<link rel="alternate" hreflang="de-DE" href="' . esc_url($german_url . $path) . '"/>' . "\n";
     } elseif ($current_blog_id == $english_site_id) {  // English site
         echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url . $path) . '"/>' . "\n";
@@ -62,11 +96,14 @@ function mn_add_hreflang_tags() {
     } elseif ($current_blog_id == $german_site_id) {  // German site
         echo '<link rel="alternate" hreflang="x-default" href="' . esc_url($english_url . $path) . '"/>' . "\n";
         echo '<link rel="alternate" hreflang="bg-BG" href="' . esc_url($bulgarian_url . $path) . '"/>' . "\n";
+        echo '<link rel="alternate" hreflang="de-DE" href="' . esc_url($german_url . $path) . '"/>' . "\n";
     }
 }
 add_action('wp_head', 'mn_add_hreflang_tags');
 
-// Enqueue detect-locale.js script
+/**
+ * Enqueue detect-locale.js script.
+ */
 function mn_enqueue_locale_script() {
     if (!is_user_logged_in() && !is_checkout() && !is_cart()) {
         wp_enqueue_script('detect-locale', 'https://lesthe.com/cdn/plugins/language-selector/js/detect-locale.js', [], null, true);
@@ -74,7 +111,9 @@ function mn_enqueue_locale_script() {
 }
 add_action('wp_enqueue_scripts', 'mn_enqueue_locale_script');
 
-// Find alternate page by SKU or slug
+/**
+ * Find alternate page by SKU or slug.
+ */
 function mn_find_alternate_page($current_post_id, $site_id) {
     switch_to_blog($site_id);
 
@@ -113,7 +152,9 @@ function mn_find_alternate_page($current_post_id, $site_id) {
     return false;
 }
 
-// Admin page for plugin settings
+/**
+ * Admin page for plugin settings.
+ */
 function mn_create_options_page() {
     add_options_page(
         __('Alternate Language Tags Settings', 'mn-multisite-alternate-lang-tags'),
@@ -125,7 +166,9 @@ function mn_create_options_page() {
 }
 add_action('admin_menu', 'mn_create_options_page');
 
-// Network admin page for network-wide settings
+/**
+ * Network admin page for network-wide settings.
+ */
 function mn_create_network_settings_page() {
     add_submenu_page(
         'settings.php',
@@ -138,7 +181,9 @@ function mn_create_network_settings_page() {
 }
 add_action('network_admin_menu', 'mn_create_network_settings_page');
 
-// Render the plugin options page
+/**
+ * Render the plugin options page.
+ */
 function mn_render_options_page() {
     echo '<div class="wrap">';
     echo '<h1>' . esc_html__('Alternate Language Tags Settings', 'mn-multisite-alternate-lang-tags') . '</h1>';
@@ -150,7 +195,9 @@ function mn_render_options_page() {
     echo '</div>';
 }
 
-// Render the network settings page
+/**
+ * Render the network settings page.
+ */
 function mn_render_network_settings_page() {
     echo '<div class="wrap">';
     echo '<h1>' . esc_html__('Network Alternate Language Tags Settings', 'mn-multisite-alternate-lang-tags') . '</h1>';
@@ -181,7 +228,9 @@ function mn_render_network_settings_page() {
     echo '</form>';
 }
 
-// Save network settings
+/**
+ * Save network settings.
+ */
 function mn_save_network_settings() {
     if (!current_user_can('manage_network_options') || !check_admin_referer('update_network_settings_nonce')) {
         return;
@@ -207,7 +256,9 @@ function mn_save_network_settings() {
 }
 add_action('network_admin_edit_update_network_settings', 'mn_save_network_settings');
 
-// Register plugin settings
+/**
+ * Register plugin settings
+ */
 function mn_register_settings() {
     register_setting('mn_alt_lang_settings', 'mn_excluded_sites');
     register_setting('mn_alt_lang_settings', 'mn_excluded_languages');
@@ -215,7 +266,9 @@ function mn_register_settings() {
 }
 add_action('admin_init', 'mn_register_settings');
 
-// Caching and transients
+/**
+ * Caching and transients.
+ */
 function mn_get_cached_hreflang_tags() {
     // Check if caching is enabled in the network settings
     $enable_caching = get_site_option('mn_enable_caching', true);
@@ -247,7 +300,9 @@ if (!wp_next_scheduled('mn_regenerate_hreflang_transient')) {
 }
 add_action('mn_regenerate_hreflang_transient', 'mn_regenerate_transient_for_all_sites');
 
-// Regenerate transient for all sites in the network
+/**
+ * Regenerate transient for all sites in the network.
+ */
 function mn_regenerate_transient_for_all_sites() {
     $sites = get_sites(['public' => 1]);
     foreach ($sites as $site) {
@@ -261,7 +316,9 @@ function mn_regenerate_transient_for_all_sites() {
     }
 }
 
-// Clean up scheduled tasks on plugin deactivation
+/**
+ * Clean up scheduled tasks on plugin deactivation.
+ */
 function mn_deactivate_plugin() {
     $timestamp = wp_next_scheduled('mn_regenerate_hreflang_transient');
     if ($timestamp) {
@@ -270,7 +327,9 @@ function mn_deactivate_plugin() {
 }
 register_deactivation_hook(__FILE__, 'mn_deactivate_plugin');
 
-// Install default network settings on plugin activation
+/**
+ * Install default network settings on plugin activation.
+ */
 function mn_activate_plugin() {
     if (!get_site_option('mn_excluded_sites')) {
         update_site_option('mn_excluded_sites', []);
