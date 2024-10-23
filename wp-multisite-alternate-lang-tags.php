@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: WordPress - Multisite Alternate Language Tags
- * Plugin URI:  https://github.dev/mnestorov/wp-multisite-alternate-lang-tags
+ * Plugin URI:  https://github.com/mnestorov/wp-multisite-alternate-lang-tags
  * Description: Handles alternate language tags for a WordPress multisite environment.
  * Version:     1.0.0
  * Author:      Martin Nestorov
